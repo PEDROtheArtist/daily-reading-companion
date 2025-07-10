@@ -58,20 +58,19 @@ jobs:
         if [ -f "data/progress.json" ]; then
           # Extract current book from progress
           CURRENT_BOOK=$(python3 -c "
-import json
-import os
-try:
-    with open('data/progress.json', 'r') as f:
-        progress = json.load(f)
-    books = progress.get('books', {})
-    # Find the first active (not completed) book
-    for book_name, book_data in books.items():
-        if not book_data.get('completed', False):
-            print(book_name)
-            break
-except:
-    pass
-")
+          import json
+          import os
+          try:
+              with open('data/progress.json', 'r') as f:
+                  progress = json.load(f)
+              books = progress.get('books', {})
+              for book_name, book_data in books.items():
+                  if not book_data.get('completed', False):
+                      print(book_name)
+                      break
+          except:
+              pass
+          ")
           
           if [ ! -z "$CURRENT_BOOK" ]; then
             echo "Sending daily reading for: $CURRENT_BOOK"
