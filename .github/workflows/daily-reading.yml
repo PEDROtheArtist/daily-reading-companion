@@ -1,0 +1,96 @@
+name: Daily Reading Companion
+
+on:
+  schedule:
+    # Run daily at 9:00 AM UTC (adjust timezone as needed)
+    - cron: '0 9 * * *'
+  workflow_dispatch:  # Allow manual triggering for testing
+
+jobs:
+  send-daily-reading:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # No external dependencies for this project
+        
+    - name: Create data directories
+      run: |
+        mkdir -p data/books data/backups logs
+        
+    - name: Set up configuration
+      env:
+        DAILY_READER_EMAIL: ${{ secrets.DAILY_READER_EMAIL }}
+        DAILY_READER_SENDER_EMAIL: ${{ secrets.DAILY_READER_SENDER_EMAIL }}
+        DAILY_READER_SENDER_PASSWORD: ${{ secrets.DAILY_READER_SENDER_PASSWORD }}
+        DAILY_READER_READING_TIME: ${{ secrets.DAILY_READER_READING_TIME }}
+      run: |
+        # Configuration will be loaded from environment variables
+        echo "Configuration loaded from environment variables"
+        
+    - name: Send daily reading email
+      env:
+        DAILY_READER_EMAIL: ${{ secrets.DAILY_READER_EMAIL }}
+        DAILY_READER_SENDER_EMAIL: ${{ secrets.DAILY_READER_SENDER_EMAIL }}
+        DAILY_READER_SENDER_PASSWORD: ${{ secrets.DAILY_READER_SENDER_PASSWORD }}
+        DAILY_READER_ENABLE_EMAIL: "true"
+        DAILY_READER_READING_TIME: ${{ secrets.DAILY_READER_READING_TIME || '10' }}
+      run: |
+        # Find the current book and send daily reading
+        if [ -f "data/progress.json" ]; then
+          # Extract current book from progress
+          CURRENT_BOOK=$(python3 -c "
+import json
+import os
+try:
+    with open('data/progress.json', 'r') as f:
+        progress = json.load(f)
+    books = progress.get('books', {})
+    # Find the first active (not completed) book
+    for book_name, book_data in books.items():
+        if not book_data.get('completed', False):
+            print(book_name)
+            break
+except:
+    pass
+")
+          
+          if [ ! -z "$CURRENT_BOOK" ]; then
+            echo "Sending daily reading for: $CURRENT_BOOK"
+            python3 -m src.main read "$CURRENT_BOOK" --send
+          else
+            echo "No active books found"
+          fi
+        else
+          echo "No progress file found - system may need initialization"
+        fi
+        
+    - name: Commit progress updates
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add data/progress.json
+        if git diff --staged --quiet; then
+          echo "No progress changes to commit"
+        else
+          git commit -m "📖 Daily reading progress update $(date +'%Y-%m-%d')"
+          git push
+        fi
