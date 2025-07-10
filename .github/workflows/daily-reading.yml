@@ -54,32 +54,44 @@ jobs:
         DAILY_READER_ENABLE_EMAIL: "true"
         DAILY_READER_READING_TIME: ${{ secrets.DAILY_READER_READING_TIME || '10' }}
       run: |
+        # Validate environment variables
+        if [ -z "$DAILY_READER_EMAIL" ] || [ -z "$DAILY_READER_SENDER_EMAIL" ] || [ -z "$DAILY_READER_SENDER_PASSWORD" ]; then
+          echo "❌ Missing required environment variables"
+          echo "Required: DAILY_READER_EMAIL, DAILY_READER_SENDER_EMAIL, DAILY_READER_SENDER_PASSWORD"
+          exit 1
+        fi
+        
+        # Check if progress file exists
+        if [ ! -f "data/progress.json" ]; then
+          echo "❌ No progress file found - system needs initialization"
+          echo "Run 'python3 -m src.main setup' and process a book first"
+          exit 1
+        fi
+        
         # Find the current book and send daily reading
-        if [ -f "data/progress.json" ]; then
-          # Extract current book from progress
-          CURRENT_BOOK=$(python3 -c "
-          import json
-          import os
-          try:
-              with open('data/progress.json', 'r') as f:
-                  progress = json.load(f)
-              books = progress.get('books', {})
-              for book_name, book_data in books.items():
-                  if not book_data.get('completed', False):
-                      print(book_name)
-                      break
-          except:
-              pass
-          ")
-          
-          if [ ! -z "$CURRENT_BOOK" ]; then
-            echo "Sending daily reading for: $CURRENT_BOOK"
-            python3 -m src.main read "$CURRENT_BOOK" --send
-          else
-            echo "No active books found"
-          fi
+        CURRENT_BOOK=$(python3 -c "import json; import sys; progress = json.load(open('data/progress.json')); books = progress.get('books', {}); [print(name) or sys.exit(0) for name, data in books.items() if not data.get('completed', False)]; sys.exit(1)" 2>/dev/null)
+        
+        if [ $? -ne 0 ] || [ -z "$CURRENT_BOOK" ]; then
+          echo "❌ No active books found or error reading progress"
+          exit 1
+        fi
+        
+        echo "📖 Sending daily reading for: $CURRENT_BOOK"
+        
+        # Verify chunks file exists
+        CHUNKS_FILE="data/${CURRENT_BOOK%.*}_chunks.json"
+        if [ ! -f "$CHUNKS_FILE" ]; then
+          echo "❌ Chunks file not found: $CHUNKS_FILE"
+          echo "Book may need to be processed again"
+          exit 1
+        fi
+        
+        # Send daily reading
+        if python3 -m src.main read "$CURRENT_BOOK" --send; then
+          echo "✅ Daily reading sent successfully"
         else
-          echo "No progress file found - system may need initialization"
+          echo "❌ Failed to send daily reading"
+          exit 1
         fi
         
     - name: Commit progress updates
