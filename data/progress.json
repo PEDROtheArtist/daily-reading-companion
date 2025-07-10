@@ -1,0 +1,10 @@
+{
+  "books": {
+    "Blink.epub": {
+      "current_chunk": 0,
+      "total_chunks": 47,
+      "reading_days": 0,
+      "completed": false
+    }
+  }
+}
