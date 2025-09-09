@@ -55,7 +55,7 @@ jobs:
         DAILY_READER_EMAIL: ${{ secrets.DAILY_READER_EMAIL }}
         DAILY_READER_SENDER_EMAIL: ${{ secrets.DAILY_READER_SENDER_EMAIL }}
         DAILY_READER_SENDER_PASSWORD: ${{ secrets.DAILY_READER_SENDER_PASSWORD }}
-        DAILY_READER_ENABLE_EMAIL: "true"
+        DAILY_READER_ENABLE_EMAIL: "false"
         DAILY_READER_READING_TIME: ${{ secrets.DAILY_READER_READING_TIME || '10' }}
       run: |
         # Validate environment variables
